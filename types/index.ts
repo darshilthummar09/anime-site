@@ -19,8 +19,13 @@ export interface Episode {
   videoUrl: string;
   thumbnail: string;
   description: string;
+}
+
+export interface EpisodeData {
+  // your existing fields...
   error?: string;
 }
+
 
 export interface User {
   id: string;
@@ -34,5 +39,6 @@ export interface WatchHistory {
   progress: number; // in seconds
   lastWatched: Date;
 }
+
 
 
