@@ -13,6 +13,7 @@ interface EpisodeData {
   }>;
   iframe?: string;
   episodeTitle?: string;
+  error?:string;
 }
 
 export default function WatchPage() {
@@ -201,3 +202,4 @@ export default function WatchPage() {
     </div>
   );
 }
+
