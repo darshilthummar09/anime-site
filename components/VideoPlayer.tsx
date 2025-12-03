@@ -134,6 +134,14 @@ export default function VideoPlayer({
     return () => document.removeEventListener('keydown', handleKeyPress);
   }, []);
 
+  // Sync volume and playbackRate with video element
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.volume = volume;
+      videoRef.current.playbackRate = playbackRate;
+    }
+  }, [volume, playbackRate]);
+
   // Video event handlers
   useEffect(() => {
     const video = videoRef.current;
@@ -468,9 +476,7 @@ export default function VideoPlayer({
         className="w-full h-full object-contain cursor-pointer"
         playsInline
         autoPlay
-        volume={volume}
         muted={muted}
-        playbackRate={playbackRate}
         onClick={togglePlay}
       />
 
