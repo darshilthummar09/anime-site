@@ -21,12 +21,6 @@ export interface Episode {
   description: string;
 }
 
-export interface EpisodeData {
-  // your existing fields...
-  error?: string;
-}
-
-
 export interface User {
   id: string;
   name: string;
@@ -39,6 +33,7 @@ export interface WatchHistory {
   progress: number; // in seconds
   lastWatched: Date;
 }
+
 
 
 
