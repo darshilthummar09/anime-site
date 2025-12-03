@@ -73,9 +73,9 @@ export default function WatchPage() {
         if (!episodeRes.ok) throw new Error('Episode not found');
 
         // Critical fix: force the type + allow unknown properties
-        const episodeData = (await episodeRes.json()) as EpisodeData;
+        const episodeData = (await episodeRes.json()) as EpisodeData & { error?: string };
 
-        // Now .error is guaranteed to be recognized
+        // Check for error property
         if (episodeData.error) {
           throw new Error(episodeData.error);
         }
