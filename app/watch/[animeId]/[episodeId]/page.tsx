@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import VideoPlayer from '@/components/VideoPlayer';
 import { animeData } from '@/data/animeData';
 
+// Define the interface globally in this file (ensures it's in scope)
 interface EpisodeData {
   sources?: Array<{
     url: string;
@@ -13,7 +14,7 @@ interface EpisodeData {
   }>;
   iframe?: string;
   episodeTitle?: string;
-  error?:string;
+  error?: string; // This must be recognized!
 }
 
 export default function WatchPage() {
@@ -39,8 +40,8 @@ export default function WatchPage() {
       try {
         setLoading(true);
         setError(null);
-        
-        // First check mock data directly (fastest and most reliable)
+
+        // Check mock data first
         const mockAnime = animeData.find((a) => a.id === animeId);
         if (mockAnime) {
           const mockEpisode = mockAnime.episodes.find((e) => e.id === episodeId);
@@ -52,106 +53,80 @@ export default function WatchPage() {
             return;
           }
         }
-        
-        // Try API if not in mock data
-        try {
-          const animeResponse = await fetch(`/api/anime/${animeId}`);
-          if (animeResponse.ok) {
-            const animeDataResponse = await animeResponse.json();
-            setAnimeTitle(animeDataResponse.title || 'Anime');
-          }
 
-          // Fetch episode streaming data
-          const episodeResponse = await fetch(`/api/anime/${animeId}/episode/${episodeId}`);
-          if (!episodeResponse.ok) {
-            throw new Error('Episode not found');
-          }
-
-          const episodeData: EpisodeData = await episodeResponse.json();
-          
-          // Check if episode has error
-          if (episodeData.error) {
-            throw new Error(episodeData.error);
-          }
-          
-          // CLIENT-SIDE FILTER: Block domains that have X-Frame-Options issues
-          const isBlockedDomain = (url: string): boolean => {
-            if (!url) return true;
-            const blockedDomains = [
-              'familynonstop.com',
-              'familynonstop',
-            ];
-            const urlLower = url.toLowerCase();
-            return blockedDomains.some(domain => urlLower.includes(domain));
-          };
-          
-          const isDirectVideo = (url: string): boolean => {
-            if (!url) return false;
-            return /\.(mp4|webm|ogg|m3u8|mkv|avi|flv|mov|wmv)(\?|$)/i.test(url) ||
-                   url.includes('video') ||
-                   url.includes('stream') ||
-                   url.includes('cdn');
-          };
-          
-          // Try to get iframe URL first, then fallback to sources
-          // STRICTLY filter out blocked domains
-          let validUrl = '';
-          
-          // Prefer sources array (usually direct video files)
-          if (episodeData.sources && episodeData.sources.length > 0) {
-            // Filter out blocked domains and prefer direct video files
-            const validSources = episodeData.sources.filter(s => {
-              const url = s.url;
-              if (!url) return false;
-              if (isBlockedDomain(url)) return false;
-              return true;
-            });
-            
-            if (validSources.length > 0) {
-              // Prefer direct video files
-              const directVideo = validSources.find(s => isDirectVideo(s.url || ''));
-              if (directVideo && directVideo.url) {
-                validUrl = directVideo.url;
-              } else {
-                // Use first valid source
-                const bestSource = validSources.find(s => s.url && !s.isM3U8) || validSources[0];
-                if (bestSource && bestSource.url) {
-                  validUrl = bestSource.url;
-                }
-              }
-            }
-          }
-          
-          // Fallback to iframe URL only if not blocked
-          if (!validUrl && episodeData.iframe) {
-            if (!isBlockedDomain(episodeData.iframe)) {
-              validUrl = episodeData.iframe;
-            }
-          }
-          
-          if (validUrl) {
-            setIframeUrl(validUrl);
-          } else {
-            // If all URLs are blocked, show error
-            setError('Video source is not available. The streaming provider blocks embedding. Please try a different episode.');
-            setLoading(false);
-            return;
-          }
-
-          if (episodeData.episodeTitle) {
-            setEpisodeTitle(episodeData.episodeTitle);
-          }
-          
-          // If no video URL found, show helpful message
-          if (!episodeData.iframe && (!episodeData.sources || episodeData.sources.length === 0 || !episodeData.sources[0]?.url)) {
-            setError('Episode found but video streaming is not available yet. Please check back later or try a different episode.');
-            setLoading(false);
-            return;
-          }
-        } catch (apiError) {
-          // If API fails, but we already checked mock data, show error
-          throw apiError;
+        // Fetch from API
+        const animeResponse = await fetch(`/api/anime/${animeId}`);
+        if (animeResponse.ok) {
+          const animeDataResponse = await animeResponse.json();
+          setAnimeTitle(animeDataResponse.title || 'Anime');
         }
+
+        const episodeResponse = await fetch(`/api/anime/${animeId}/episode/${episodeId}`);
+        if (!episodeResponse.ok) {
+          throw new Error('Episode not found');
+        }
+
+        // Fix: Explicitly type with possible error field
+        const episodeData = await episodeResponse.json() as EpisodeData;
+
+        // Now TypeScript knows .error can exist
+        if (episodeData.error) {
+          throw new Error(episodeData.error);
+        }
+
+        const isBlockedDomain = (url: string): boolean => {
+          if (!url) return true;
+          const blockedDomains = ['familynonstop.com', 'familynonstop'];
+          const urlLower = url.toLowerCase();
+          return blockedDomains.some(domain => urlLower.includes(domain));
+        };
+
+        const isDirectVideo = (url: string): boolean => {
+          if (!url) return false;
+          return /\.(mp4|webm|ogg|m3u8|mkv|avi|flv|mov|wmv)(\?|$)/i.test(url) ||
+                 url.includes('video') ||
+                 url.includes('stream') ||
+                 url.includes('cdn');
+        };
+
+        let validUrl = '';
+
+        if (episodeData.sources && episodeData.sources.length > 0) {
+          const validSources = episodeData.sources.filter(s => s.url && !isBlockedDomain(s.url));
+          
+          if (validSources.length > 0) {
+            const directVideo = validSources.find(s => isDirectVideo(s.url));
+            if (directVideo?.url) {
+              validUrl = directVideo.url;
+            } else {
+              const best = validSources.find(s => !s.isM3U8) || validSources[0];
+              validUrl = best.url;
+            }
+          }
+        }
+
+        if (!validUrl && episodeData.iframe && !isBlockedDomain(episodeData.iframe)) {
+          validUrl = episodeData.iframe;
+        }
+
+        if (validUrl) {
+          setIframeUrl(validUrl);
+        } else {
+          setError('Video source is not available. The streaming provider blocks embedding. Please try a different episode.');
+          setLoading(false);
+          return;
+        }
+
+        if (episodeData.episodeTitle) {
+          setEpisodeTitle(episodeData.episodeTitle);
+        }
+
+        if (!episodeData.iframe && (!episodeData.sources || episodeData.sources.length === 0)) {
+          setError('Episode found but video streaming is not available yet.');
+          setLoading(false);
+          return;
+        }
+
       } catch (err: any) {
         setError(err.message || 'Failed to load episode');
         console.error('Error fetching episode:', err);
@@ -202,4 +177,3 @@ export default function WatchPage() {
     </div>
   );
 }
-
